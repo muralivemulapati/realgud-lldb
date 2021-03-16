@@ -49,6 +49,50 @@ This should be an executable on your path, or an absolute file name."
 ;; The end.
 ;;
 
+(defun realgud--lldb-pid-command-buffer (pid)
+  "Return the command buffer used when lldb attach -p PID is invoked"
+  (format "*lldb %d shell*" pid)
+  )
+
+(defun realgud--lldb-find-command-buffer (pid)
+  "Find among current buffers a buffer that is a realgud command buffer
+running lldb on process number PID"
+  (let ((find-cmd-buf "*lldb attach shell*")
+        (cmd-buf-new-name (realgud--lldb-pid-command-buffer pid))
+	(found-buf))
+    (dolist (buf (buffer-list))
+      (message "name:%s" (buffer-name buf))
+      )
+    (dolist (buf (buffer-list))
+      (when (and (equal find-cmd-buf (buffer-name buf))
+		(realgud-cmdbuf? buf)
+		(get-buffer-process buf))
+        (setq found-buf buf)
+        (with-current-buffer buf
+          (rename-buffer cmd-buf-new-name))))
+    found-buf))
+
+(defun realgud--lldb-pid (pid)
+  "Start debugging lldb process with pid PID."
+  (interactive "nEnter the pid that lldb should attach to: ")
+  (realgud--lldb (format "%s attach -p %d" realgud--lldb-command-name pid))
+  ;; FIXME: should add code to test if attach worked.
+  )
+
+(defun realgud--lldb-pid-associate (pid)
+  "Start debugging lldb process with pid PID and associate the
+current buffer to that realgud command buffer."
+  (interactive "nEnter the pid that lldb should attach to and associate the current buffer to: ")
+  (let* ((command-buf)
+	 (source-buf (current-buffer))
+	 )
+    (realgud--lldb-pid pid)
+    (setq command-buf (realgud--lldb-find-command-buffer pid))
+    (if command-buf
+	(with-current-buffer source-buf
+	  (realgud:cmdbuf-associate))
+      )))
+
 ;;;###autoload
 (defun realgud--lldb (&optional opt-cmd-line no-reset)
   "Invoke the lldb debugger and start the Emacs user interface.
@@ -82,6 +126,9 @@ fringe and marginal icons.
 	  (set (make-local-variable 'realgud--lldb-file-remap)
 	       (make-hash-table :test 'equal))
 	  (realgud:remove-ansi-schmutz)
+	  (realgud--lldb-remove-spurious-source-code-lines)
+	  (realgud--lldb-postoutput-scroll-to-bottom)
+	  (realgud-command "settings set frame-format \"frame #${frame.index}: ${frame.pc}{ ${module.file.basename}{\`${function.name-with-args}{${frame.no-debug}${function.pc-offset}}}}{ at ${line.file.fullpath}:${line.number}}{${function.is-optimized} [opt]}\\n\"" nil nil nil)
 	  )
       )
     )

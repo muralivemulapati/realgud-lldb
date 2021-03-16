@@ -78,15 +78,11 @@
     (realgud:cmd-break)
     ))
 
-
-;; FIXME: setting a breakpoint should add a[ file-to-basename mapping
-;; so that when this is called it can look up the short name and
-;; remap it.
 (defun realgud--lldb-loc-fn-callback(text filename lineno source-str
 					 cmd-mark directory column)
   (realgud:file-loc-from-line filename lineno
-			      cmd-mark source-str nil nil directory))
-			      ;; 'realgud--lldb-find-file directory))
+			      cmd-mark source-str nil
+                              'realgud--lldb-find-file directory))
 
 (defun realgud--lldb-parse-cmd-args (orig-args)
   "Parse command line ARGS for the annotate level and name of script to debug.
@@ -245,5 +241,22 @@ breakpoints, etc.)."
   "Use `customize' to edit the settings of the `realgud--lldb' debugger."
   (interactive)
   (customize-group 'realgud--lldb))
+
+
+(defun realgud--lldb-remove-spurious-source-code-lines ()
+  "Remove lines of source code that lldb shows when a frame is displayed"
+  (add-to-list
+   'comint-preoutput-filter-functions
+   (lambda (output)
+     (replace-regexp-in-string  "^.*frame.*\n\\(\\(\\(   [[:digit:]]+.+\n\\)*\\(->.+\n\\)\\(.*\n\\)\\(   [[:digit:]]+.+\n\\)*\\)*\\)" "" output nil nil 1)))
+  )
+
+(defun realgud--lldb-postoutput-scroll-to-bottom ()
+  "Scroll to bottom of buffer after output"
+  (add-hook
+   'comint-output-filter-functions
+   'comint-postoutput-scroll-to-bottom)
+  )
+
 
 (provide-me "realgud--lldb-")
